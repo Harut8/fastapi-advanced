@@ -21,11 +21,20 @@ from .core import (
     msgspec_to_pydantic,
     # Response Helpers
     paginated_response,
-    parse_body,
     response,
     # Setup
     setup_msgspec,
     validation_error_handler,
+)
+from .exceptions import (
+    # Base Exception
+    FastAPIAdvancedError,
+    # Specific Exceptions
+    ConfigurationError,
+    PaginationError,
+    ResponseSerializationError,
+    SchemaGenerationError,
+    TypeConversionError,
 )
 
 __all__ = [
@@ -41,8 +50,7 @@ __all__ = [
     "MsgspecJSONResponse",
     # Request Body Helpers
     "as_body",  # Pydantic-based (for OpenAPI)
-    "parse_body",  # msgspec-based (for performance)
-    # Setup (ONE LINE!)
+    # Setup
     "setup_msgspec",
     # Response Helpers
     "response",  # Typed response function (generic via stub files)
@@ -54,4 +62,11 @@ __all__ = [
     "decode_error_handler",
     # Performance Indicators
     "_CYTHON_AVAILABLE",
+    # Exceptions
+    "FastAPIAdvancedError",
+    "ConfigurationError",
+    "PaginationError",
+    "ResponseSerializationError",
+    "SchemaGenerationError",
+    "TypeConversionError",
 ]

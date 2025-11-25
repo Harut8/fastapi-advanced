@@ -7,13 +7,13 @@ High-performance FastAPI integration with msgspec for fast serialization and aut
 
 ## Overview
 
-FastAPI's default Pydantic serialization can be a bottleneck in high-throughput applications. This library integrates [msgspec](https://jcristharif.com/msgspec/) to provide significant performance improvements while maintaining full OpenAPI compatibility.
+FastAPI's default Pydantic serialization can be a bottleneck in high-throughput applications. This library integrates [msgspec](https://jcristharif.com/msgspec/) for fast response serialization while maintaining full OpenAPI compatibility through Pydantic for request validation.
 
 ### Key Benefits
 
-- **2-5x faster** request parsing and response serialization
+- **2-5x faster** response serialization with msgspec
 - **10-20x faster** object creation compared to Pydantic
-- **Full OpenAPI support** through automatic Pydantic bridge
+- **Full OpenAPI support** - Pydantic for requests, msgspec for responses
 - **Type-safe** with perfect mypy strict compliance
 - **Minimal changes** from existing Pydantic implementations
 - **Production-ready** with Cython optimizations available
@@ -299,9 +299,11 @@ Benchmark results (see `PERFORMANCE.md` for details):
 
 | Operation | Pydantic | fastapi-advanced | Improvement |
 |-----------|----------|------------------|-------------|
-| Serialization | 1.00x | 5.12x | 5.1x faster |
-| Deserialization | 1.00x | 3.84x | 3.8x faster |
+| Response Serialization | 1.00x | 5.12x | 5.1x faster |
 | Object Creation | 1.00x | 12.45x | 12.4x faster |
+| Type Conversion | 1.00x | 2.0-3.0x | 2-3x faster (with Cython) |
+
+**Note**: Request validation uses Pydantic (for OpenAPI docs). Response serialization uses msgspec (for performance).
 
 ## Type Checking
 
