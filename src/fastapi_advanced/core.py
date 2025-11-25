@@ -157,7 +157,8 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
     """
     Convert msgspec.Struct to Pydantic BaseModel for OpenAPI generation.
 
-    Thread-safe with caching for performance.
+    Thread-safe with caching for performance. Supports camelCase field renaming
+    when the msgspec.Struct uses rename="camel".
 
     Args:
         struct_cls: msgspec.Struct class to convert
@@ -170,11 +171,11 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
         TypeConversionError: If field type conversion fails.
 
     Example:
-        >>> class User(msgspec.Struct):
-        ...     name: str
+        >>> class User(msgspec.Struct, rename="camel"):
+        ...     full_name: str
         ...     email: str
         >>> UserSchema = msgspec_to_pydantic(User)
-        >>> # Use in FastAPI: response_model=UserSchema
+        >>> # OpenAPI will show: {"fullName": "...", "email": "..."}
     """
     # Fast path: check cache without lock
     if struct_cls in _SCHEMA_REGISTRY:
@@ -193,17 +194,68 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
             if not field_definitions:
                 logger.warning(f"No fields found in struct {struct_cls.__name__}")
 
+            # Check if struct uses camelCase renaming
+            type_info = msgspec.inspect.type_info(struct_cls)
+            uses_camel_case = False
+
+            # Check if any field has a different encode_name (indicates renaming)
+            for field in type_info.fields:
+                if field.encode_name != field.name:
+                    uses_camel_case = True
+                    break
+
+            # Create Pydantic Config if camelCase is used
+            config_dict = None
+            if uses_camel_case:
+                # Create field aliases for Pydantic
+                from pydantic import Field
+
+                # Rebuild field_definitions with Field(alias=...)
+                new_field_definitions = {}
+                for field in type_info.fields:
+                    python_type, default_value = field_definitions[field.name]
+
+                    if field.encode_name != field.name:
+                        # Add alias for camelCase
+                        if default_value is ...:
+                            new_field_definitions[field.name] = (
+                                python_type,
+                                Field(..., alias=field.encode_name)
+                            )
+                        else:
+                            new_field_definitions[field.name] = (
+                                python_type,
+                                Field(default=default_value, alias=field.encode_name)
+                            )
+                    else:
+                        new_field_definitions[field.name] = (python_type, default_value)
+
+                field_definitions = new_field_definitions
+
+                # Create Config that allows population by field name OR alias
+                config_dict = {
+                    "populate_by_name": True,  # Allow both snake_case and camelCase
+                }
+
             # Create Pydantic model
-            pydantic_model = create_model(
-                f"{struct_cls.__name__}Schema", __config__=None, **field_definitions
-            )
+            if config_dict:
+                from pydantic import ConfigDict
+                pydantic_model = create_model(
+                    f"{struct_cls.__name__}Schema",
+                    __config__=ConfigDict(**config_dict),
+                    **field_definitions
+                )
+            else:
+                pydantic_model = create_model(
+                    f"{struct_cls.__name__}Schema", __config__=None, **field_definitions
+                )
 
             # Attach original struct reference
             pydantic_model.__msgspec_struct__ = struct_cls  # type: ignore[attr-defined]
 
             # Cache the result
             _SCHEMA_REGISTRY[struct_cls] = pydantic_model
-            logger.debug(f"Successfully generated schema for {struct_cls.__name__}")
+            logger.debug(f"Successfully generated schema for {struct_cls.__name__} (camelCase: {uses_camel_case})")
             return pydantic_model  # type: ignore[return-value]
 
         except TypeConversionError:
