@@ -35,7 +35,7 @@ class TypeConversionError(FastAPIAdvancedError):
         self,
         field_type: Any,
         field_name: str | None = None,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ) -> None:
         """
         Initialize type conversion error.
@@ -64,11 +64,7 @@ class TypeConversionError(FastAPIAdvancedError):
 class SchemaGenerationError(FastAPIAdvancedError):
     """Raised when Pydantic schema generation fails."""
 
-    def __init__(
-        self,
-        struct_name: str,
-        original_error: Exception | None = None
-    ) -> None:
+    def __init__(self, struct_name: str, original_error: Exception | None = None) -> None:
         """
         Initialize schema generation error.
 
@@ -95,7 +91,7 @@ class PaginationError(FastAPIAdvancedError):
         page: int | None = None,
         page_size: int | None = None,
         total_results: int | None = None,
-        message: str | None = None
+        message: str | None = None,
     ) -> None:
         """
         Initialize pagination error.
@@ -137,11 +133,7 @@ class PaginationError(FastAPIAdvancedError):
 class ResponseSerializationError(FastAPIAdvancedError):
     """Raised when response serialization fails."""
 
-    def __init__(
-        self,
-        data: Any,
-        original_error: Exception | None = None
-    ) -> None:
+    def __init__(self, data: Any, original_error: Exception | None = None) -> None:
         """
         Initialize response serialization error.
 

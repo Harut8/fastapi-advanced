@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from functools import lru_cache
 from typing import Any, Generic, TypeVar
 
 import msgspec
@@ -13,7 +12,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, create_model
 
 from .exceptions import (
-    ConfigurationError,
     PaginationError,
     ResponseSerializationError,
     SchemaGenerationError,
@@ -132,10 +130,12 @@ _SCHEMA_REGISTRY: dict[type[msgspec.Struct], type[BaseModel]] = {}
 _SCHEMA_LOCK = threading.Lock()
 
 
-@lru_cache(maxsize=256)
 def _msgspec_type_to_python_type(field_type: Any) -> Any:
     """
-    Convert msgspec type to Python type annotation with caching.
+    Convert msgspec type to Python type annotation with error handling.
+
+    Note: Caching is handled inside the _convert_type_impl function
+    since msgspec types are not hashable for @lru_cache.
 
     Args:
         field_type: msgspec type to convert.
@@ -150,10 +150,7 @@ def _msgspec_type_to_python_type(field_type: Any) -> Any:
         return _convert_type_impl(field_type)
     except Exception as e:
         logger.error(f"Type conversion failed for {field_type}: {e}")
-        raise TypeConversionError(
-            field_type=field_type,
-            original_error=e
-        ) from e
+        raise TypeConversionError(field_type=field_type, original_error=e) from e
 
 
 def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
@@ -191,9 +188,7 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
 
         try:
             # Process struct fields
-            field_definitions = process_struct_fields_fast(
-                struct_cls, _msgspec_type_to_python_type
-            )
+            field_definitions = process_struct_fields_fast(struct_cls, _msgspec_type_to_python_type)
 
             if not field_definitions:
                 logger.warning(f"No fields found in struct {struct_cls.__name__}")
@@ -204,22 +199,19 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
             )
 
             # Attach original struct reference
-            pydantic_model.__msgspec_struct__ = struct_cls  # type: ignore
+            pydantic_model.__msgspec_struct__ = struct_cls  # type: ignore[attr-defined]
 
             # Cache the result
             _SCHEMA_REGISTRY[struct_cls] = pydantic_model
             logger.debug(f"Successfully generated schema for {struct_cls.__name__}")
-            return pydantic_model
+            return pydantic_model  # type: ignore[return-value]
 
         except TypeConversionError:
             # Re-raise type conversion errors with additional context
             raise
         except Exception as e:
             logger.error(f"Failed to generate schema for {struct_cls.__name__}: {e}")
-            raise SchemaGenerationError(
-                struct_name=struct_cls.__name__,
-                original_error=e
-            ) from e
+            raise SchemaGenerationError(struct_name=struct_cls.__name__, original_error=e) from e
 
 
 def as_body(struct_cls: type[T]) -> Any:
@@ -236,7 +228,7 @@ def as_body(struct_cls: type[T]) -> Any:
             user = User(name=data.name, email=data.email)
             return response(user)
     """
-    return msgspec_to_pydantic(struct_cls)
+    return msgspec_to_pydantic(struct_cls)  # type: ignore[arg-type]
 
 
 # ============================================================================
@@ -282,7 +274,7 @@ def response(
         )
 
         # Create response model
-        response_model = ResponseModel(**response_dict)
+        response_model: ResponseModel[Any] = ResponseModel(**response_dict)
 
         return MsgspecJSONResponse(
             content=response_model,
@@ -290,22 +282,14 @@ def response(
         )
     except msgspec.EncodeError as e:
         logger.error(f"Failed to encode response data: {e}")
-        raise ResponseSerializationError(
-            data=data,
-            original_error=e
-        ) from e
+        raise ResponseSerializationError(data=data, original_error=e) from e
     except Exception as e:
         logger.error(f"Unexpected error creating response: {e}")
         # Fallback to error response
-        error_response = ResponseModel(
-            status="error",
-            data=None,
-            message=f"Failed to create response: {str(e)}"
+        error_response: ResponseModel[None] = ResponseModel(
+            status="error", data=None, message=f"Failed to create response: {str(e)}"
         )
-        return MsgspecJSONResponse(
-            content=error_response,
-            status_code=500
-        )
+        return MsgspecJSONResponse(content=error_response, status_code=500)
 
 
 def paginated_response(
@@ -366,7 +350,7 @@ def paginated_response(
         )
 
         # Create paginated response
-        paginated_model = PaginatedResponse(**paginated_dict)
+        paginated_model: PaginatedResponse[Any] = PaginatedResponse(**paginated_dict)
 
         return MsgspecJSONResponse(
             content=paginated_model,
@@ -374,22 +358,14 @@ def paginated_response(
         )
     except msgspec.EncodeError as e:
         logger.error(f"Failed to encode paginated response: {e}")
-        raise ResponseSerializationError(
-            data=items,
-            original_error=e
-        ) from e
+        raise ResponseSerializationError(data=items, original_error=e) from e
     except Exception as e:
         logger.error(f"Unexpected error creating paginated response: {e}")
         # Fallback to error response
-        error_response = ResponseModel(
-            status="error",
-            data=None,
-            message=f"Failed to create paginated response: {str(e)}"
+        error_response: ResponseModel[None] = ResponseModel(
+            status="error", data=None, message=f"Failed to create paginated response: {str(e)}"
         )
-        return MsgspecJSONResponse(
-            content=error_response,
-            status_code=500
-        )
+        return MsgspecJSONResponse(content=error_response, status_code=500)
 
 
 # ============================================================================
@@ -430,7 +406,7 @@ async def decode_error_handler(request: Request, exc: msgspec.DecodeError) -> Ms
 
 def setup_msgspec(app: FastAPI) -> FastAPI:
     """Setup FastAPI app with msgspec integration."""
-    app.router.default_response_class = MsgspecJSONResponse  # type: ignore
-    app.add_exception_handler(msgspec.ValidationError, validation_error_handler)  # type: ignore
-    app.add_exception_handler(msgspec.DecodeError, decode_error_handler)  # type: ignore
+    app.router.default_response_class = MsgspecJSONResponse  # type: ignore[assignment]
+    app.add_exception_handler(msgspec.ValidationError, validation_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(msgspec.DecodeError, decode_error_handler)  # type: ignore[arg-type]
     return app

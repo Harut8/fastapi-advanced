@@ -1,7 +1,6 @@
 """Pure Python fallback for _speedups module (used when Cython not available)."""
 
 import re
-from functools import lru_cache
 from typing import Any
 
 

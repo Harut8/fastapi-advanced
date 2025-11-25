@@ -27,10 +27,10 @@ from .core import (
     validation_error_handler,
 )
 from .exceptions import (
-    # Base Exception
-    FastAPIAdvancedError,
     # Specific Exceptions
     ConfigurationError,
+    # Base Exception
+    FastAPIAdvancedError,
     PaginationError,
     ResponseSerializationError,
     SchemaGenerationError,
