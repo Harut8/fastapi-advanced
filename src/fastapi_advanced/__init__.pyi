@@ -2,7 +2,7 @@
 
 from typing import Any, Generic, TypeVar, overload
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -16,6 +16,8 @@ __all__ = [
     # Response functions
     "response",
     "paginated_response",
+    # Request body parsing
+    "parse_body",
     # Conversion utilities
     "msgspec_to_pydantic",
     "as_body",
@@ -124,6 +126,12 @@ def paginated_response(
     status: str = "ok",
     status_code: int = 200,
 ) -> PaginatedResponseSchema[T]: ...
+
+# ============================================================================
+# Request Body Parsing
+# ============================================================================
+
+async def parse_body(request: Request, struct_type: type[T]) -> T: ...
 
 # ============================================================================
 # Conversion Utilities

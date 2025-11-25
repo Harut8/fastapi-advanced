@@ -13,7 +13,7 @@ from .core import (
     PaginatedResponseSchema,
     ResponseModel,
     ResponseModelSchema,
-    # Request Body Helper
+    # Request Body Helpers
     as_body,
     # Error Handlers
     decode_error_handler,
@@ -21,6 +21,7 @@ from .core import (
     msgspec_to_pydantic,
     # Response Helpers
     paginated_response,
+    parse_body,
     response,
     # Setup
     setup_msgspec,
@@ -38,8 +39,9 @@ __all__ = [
     "PaginatedResponseSchema",
     # Response Classes
     "MsgspecJSONResponse",
-    # Request Body
-    "as_body",
+    # Request Body Helpers
+    "as_body",  # Pydantic-based (for OpenAPI)
+    "parse_body",  # msgspec-based (for performance)
     # Setup (ONE LINE!)
     "setup_msgspec",
     # Response Helpers

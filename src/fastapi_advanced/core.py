@@ -162,23 +162,17 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
 
 def as_body(struct_cls: type[T]) -> Any:
     """
-    Get Pydantic model for request body validation and OpenAPI docs.
+    Convert msgspec.Struct to Pydantic for request body validation.
 
-    Use as FastAPI dependency annotation for request bodies.
+    Provides FastAPI request validation and OpenAPI documentation.
 
-    Args:
-        struct_cls: msgspec.Struct class to use for validation
+    Usage:
+        CreateUserBody = as_body(CreateUser)
 
-    Returns:
-        Pydantic model class for FastAPI Body parameter
-
-    Example:
-        >>> class CreateUser(msgspec.Struct):
-        ...     name: str
-        ...     email: str
-        >>> @app.post("/users")
-        ... async def create_user(data: CreateUserSchema = as_body(CreateUser)):
-        ...     return response(data)
+        @app.post("/users")
+        async def create_user(data: CreateUserBody):
+            user = User(name=data.name, email=data.email)
+            return response(user)
     """
     return msgspec_to_pydantic(struct_cls)
 
@@ -249,6 +243,39 @@ def paginated_response(
         content=PaginatedResponse(**paginated_dict),
         status_code=status_code,
     )
+
+
+# ============================================================================
+# Request Body Parsing with msgspec
+# ============================================================================
+
+# Cache msgspec decoders for performance (avoid recreating on every request)
+_decoder_cache: dict[type[Any], msgspec.json.Decoder[Any]] = {}
+_decoder_cache_lock = threading.Lock()
+
+
+def _get_decoder(struct_type: type[T]) -> msgspec.json.Decoder[T]:
+    """Get cached decoder for the given struct type."""
+    if struct_type not in _decoder_cache:
+        with _decoder_cache_lock:
+            # Double-check inside lock
+            if struct_type not in _decoder_cache:
+                _decoder_cache[struct_type] = msgspec.json.Decoder(struct_type)
+    return _decoder_cache[struct_type]
+
+
+async def parse_body(request: Request, struct_type: type[T]) -> T:
+    """
+    Parse request body with msgspec (2-5x faster than Pydantic).
+
+    Automatically handles validation errors via setup_msgspec() error handlers.
+
+    Usage:
+        user = await parse_body(request, User)
+    """
+    body = await request.body()
+    decoder = _get_decoder(struct_type)
+    return decoder.decode(body)
 
 
 # ============================================================================
