@@ -1,12 +1,14 @@
-"""
-FastAPI application using msgspec for serialization (your approach).
+"""FastAPI application using msgspec for high-performance serialization.
 
-This benchmark app demonstrates the performance of using msgspec.Struct
-with the fastapi-advanced library's MsgspecJSONResponse.
+This benchmark demonstrates the correct usage pattern for fastapi-advanced:
+- msgspec.Struct for runtime performance
+- TYPE_CHECKING pattern for clean type annotations
+- Proper generic typing with ResponseModelSchema
+- No unnecessary type: ignore comments
 """
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 from fastapi import Body, FastAPI
 
@@ -28,27 +30,37 @@ app = FastAPI(
     version="1.0.0",
 )
 
-print("Runnin on cython", _CYTHON_AVAILABLE)
-# Setup msgspec integration (one-line setup!)
+print(f"Cython optimizations: {'enabled' if _CYTHON_AVAILABLE else 'disabled'}")
+
 setup_msgspec(app)
 
-# Convert msgspec User model to Pydantic for OpenAPI documentation
-# ResponseModelSchema and PaginatedResponseSchema are imported from the library
-UserSchema = msgspec_to_pydantic(User)
+# Convert msgspec models to Pydantic for type annotations
+if TYPE_CHECKING:
+    UserSchema = User
+    UserCreateBody = UserCreate
+    UserUpdateBody = UserUpdate
+else:
+    UserSchema = msgspec_to_pydantic(User)
+    UserCreateBody = as_body(UserCreate)
+    UserUpdateBody = as_body(UserUpdate)
 
-# In-memory database simulation
+# In-memory database
 users_db: dict[int, User] = {}
 next_user_id = 1
 
 
 @app.get("/")
-async def health_check() -> ResponseModelSchema[dict[str, Any]]:
+async def health_check() -> ResponseModelSchema[dict[str, str]]:
     """Health check endpoint."""
-    return response(data={"status": "healthy", "timestamp": datetime.now().isoformat()})  # type: ignore[no-any-return]
+    return response(
+        data={"status": "healthy", "timestamp": datetime.now().isoformat()}
+    )
 
 
-@app.post("/users", response_model=ResponseModelSchema[UserSchema], status_code=201)
-async def create_user(user_data: as_body(UserCreate) = Body(...)) -> Any:
+@app.post("/users", status_code=201)
+async def create_user(
+    user_data: UserCreateBody = Body(...)
+) -> ResponseModelSchema[UserSchema]:
     """Create a new user with msgspec validation."""
     global next_user_id
 
@@ -63,7 +75,11 @@ async def create_user(user_data: as_body(UserCreate) = Body(...)) -> Any:
         )
         users_db[next_user_id] = user
         next_user_id += 1
-        return response(data=user, message="User created successfully", status_code=201)
+        return response(
+            data=user,
+            message="User created successfully",
+            status_code=201,
+        )
     except ValueError as e:
         return response(
             data=None,
@@ -73,8 +89,8 @@ async def create_user(user_data: as_body(UserCreate) = Body(...)) -> Any:
         )
 
 
-@app.get("/users/{user_id}", response_model=ResponseModelSchema[UserSchema])
-async def get_user(user_id: int) -> Any:
+@app.get("/users/{user_id}")
+async def get_user(user_id: int) -> ResponseModelSchema[UserSchema]:
     """Retrieve a single user by ID."""
     user = users_db.get(user_id)
     if not user:
@@ -87,8 +103,11 @@ async def get_user(user_id: int) -> Any:
     return response(data=user)
 
 
-@app.get("/users", response_model=PaginatedResponseSchema[UserSchema])
-async def list_users(page: int = 1, page_size: int = 100) -> Any:
+@app.get("/users")
+async def list_users(
+    page: int = 1,
+    page_size: int = 100
+) -> PaginatedResponseSchema[UserSchema]:
     """List users with pagination."""
     all_users = list(users_db.values())
     total_results = len(all_users)
@@ -105,8 +124,11 @@ async def list_users(page: int = 1, page_size: int = 100) -> Any:
     )
 
 
-@app.put("/users/{user_id}", response_model=ResponseModelSchema[UserSchema])
-async def update_user(user_id: int, user_data: as_body(UserUpdate) = Body(...)) -> Any:
+@app.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: UserUpdateBody = Body(...)
+) -> ResponseModelSchema[UserSchema]:
     """Update an existing user."""
     user = users_db.get(user_id)
     if not user:
@@ -118,13 +140,20 @@ async def update_user(user_id: int, user_data: as_body(UserUpdate) = Body(...)) 
         )
 
     try:
-        # Create updated user with new values
         updated_user = User(
             id=user.id,
             username=user_data.username if user_data.username else user.username,
             email=user_data.email if user_data.email else user.email,
-            full_name=user_data.full_name if user_data.full_name is not None else user.full_name,
-            is_active=user_data.is_active if user_data.is_active is not None else user.is_active,
+            full_name=(
+                user_data.full_name
+                if user_data.full_name is not None
+                else user.full_name
+            ),
+            is_active=(
+                user_data.is_active
+                if user_data.is_active is not None
+                else user.is_active
+            ),
             created_at=user.created_at,
         )
         users_db[user_id] = updated_user
@@ -138,8 +167,8 @@ async def update_user(user_id: int, user_data: as_body(UserUpdate) = Body(...)) 
         )
 
 
-@app.delete("/users/{user_id}", response_model=ResponseModelSchema[dict[str, Any]])
-async def delete_user(user_id: int) -> Any:
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: int) -> ResponseModelSchema[dict[str, int] | None]:
     """Delete a user by ID."""
     if user_id not in users_db:
         return response(
@@ -153,8 +182,8 @@ async def delete_user(user_id: int) -> Any:
     return response(data={"id": user_id}, message="User deleted successfully")
 
 
-@app.post("/users/seed", response_model=ResponseModelSchema[dict[str, Any]])
-async def seed_users(count: int = 100) -> Any:
+@app.post("/users/seed")
+async def seed_users(count: int = 100) -> ResponseModelSchema[dict[str, int]]:
     """Seed the database with test users for benchmarking."""
     global next_user_id
 
@@ -178,8 +207,8 @@ async def seed_users(count: int = 100) -> Any:
     )
 
 
-@app.delete("/users/clear", response_model=ResponseModelSchema[dict[str, Any]])
-async def clear_users() -> Any:
+@app.delete("/users/clear")
+async def clear_users() -> ResponseModelSchema[dict[str, int]]:
     """Clear all users from the database."""
     global next_user_id
     count = len(users_db)

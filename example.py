@@ -8,7 +8,7 @@ Key Features:
 - msgspec for 2-5x faster serialization
 - Pydantic only for OpenAPI documentation
 - Perfect IDE autocomplete and mypy --strict passing
-- Minimal type: ignore comments needed
+- TYPE_CHECKING pattern eliminates type: ignore comments
 
 Run:
     uvicorn example:app --reload
@@ -16,6 +16,8 @@ Run:
 Docs:
     http://localhost:8000/docs
 """
+
+from typing import TYPE_CHECKING
 
 import msgspec
 from fastapi import FastAPI
@@ -57,9 +59,14 @@ class User(msgspec.Struct, rename="camel"):  # type: ignore[call-arg, misc]
 # Pydantic Schemas - For OpenAPI Documentation ONLY
 # ============================================================================
 
-# Convert msgspec models to Pydantic for OpenAPI generation
-UserSchema = msgspec_to_pydantic(User)
-CreateUserRequestBody = as_body(CreateUserRequest)
+# Convert msgspec models to Pydantic for type annotations
+# TYPE_CHECKING pattern eliminates type: ignore comments in function signatures
+if TYPE_CHECKING:
+    UserSchema = User
+    CreateUserRequestBody = CreateUserRequest
+else:
+    UserSchema = msgspec_to_pydantic(User)
+    CreateUserRequestBody = as_body(CreateUserRequest)
 
 # ============================================================================
 # App Setup
@@ -95,8 +102,8 @@ async def root() -> ResponseModelSchema[dict[str, str]]:
 
 @app.post("/users", status_code=201)
 async def create_user(
-    data: CreateUserRequestBody,  # type: ignore[valid-type]
-) -> ResponseModelSchema[UserSchema]:  # type: ignore[valid-type]
+    data: CreateUserRequestBody,
+) -> ResponseModelSchema[UserSchema]:
     """
     Create a new user.
 
@@ -110,9 +117,9 @@ async def create_user(
 
     user = User(
         id=next_id,
-        username=data.username,  # type: ignore[attr-defined]
-        email=data.email,  # type: ignore[attr-defined]
-        full_name=data.full_name,  # type: ignore[attr-defined]
+        username=data.username,
+        email=data.email,
+        full_name=data.full_name,
         is_active=True,
     )
 
@@ -127,7 +134,7 @@ async def create_user(
 
 
 @app.get("/users/{user_id}")
-async def get_user(user_id: int) -> ResponseModelSchema[UserSchema]:  # type: ignore[valid-type]
+async def get_user(user_id: int) -> ResponseModelSchema[UserSchema | None]:
     """Get a user by ID."""
     if user_id not in users_db:
         return response(
@@ -144,7 +151,7 @@ async def get_user(user_id: int) -> ResponseModelSchema[UserSchema]:  # type: ig
 
 
 @app.get("/users")
-async def list_users(page: int = 1, page_size: int = 10) -> PaginatedResponseSchema[UserSchema]:  # type: ignore[valid-type]
+async def list_users(page: int = 1, page_size: int = 10) -> PaginatedResponseSchema[UserSchema]:
     """
     List users with pagination.
 
@@ -188,8 +195,8 @@ async def delete_user(user_id: int) -> ResponseModelSchema[dict[str, int | str] 
 @app.put("/users/{user_id}")
 async def update_user(
     user_id: int,
-    data: CreateUserRequestBody,  # type: ignore[valid-type]
-) -> ResponseModelSchema[UserSchema]:  # type: ignore[valid-type]
+    data: CreateUserRequestBody,
+) -> ResponseModelSchema[UserSchema | None]:
     """Update a user."""
     if user_id not in users_db:
         return response(
@@ -201,9 +208,9 @@ async def update_user(
 
     updated_user = User(
         id=user_id,
-        username=data.username,  # type: ignore[attr-defined]
-        email=data.email,  # type: ignore[attr-defined]
-        full_name=data.full_name,  # type: ignore[attr-defined]
+        username=data.username,
+        email=data.email,
+        full_name=data.full_name,
         is_active=users_db[user_id].is_active,
     )
 
