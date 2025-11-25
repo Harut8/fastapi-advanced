@@ -10,7 +10,6 @@ VENV_PYTHON := .venv/bin/python
 PACKAGE_NAME := fastapi-advanced
 SRC_DIR := src/fastapi_advanced
 TESTS_DIR := tests
-EXAMPLES_DIR := examples
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -31,23 +30,23 @@ install-build: ## Install build dependencies (Cython, setuptools, wheel)
 
 lint: ## Run ruff linter
 	@echo "Running ruff linter..."
-	$(UV) run ruff check $(SRC_DIR) $(TESTS_DIR) $(EXAMPLES_DIR)
+	$(UV) run ruff check $(SRC_DIR) $(TESTS_DIR) example.py
 
 lint-fix: ## Run ruff linter with auto-fix
 	@echo "Running ruff linter with auto-fix..."
-	$(UV) run ruff check --fix $(SRC_DIR) $(TESTS_DIR) $(EXAMPLES_DIR)
+	$(UV) run ruff check --fix $(SRC_DIR) $(TESTS_DIR) example.py
 
 format: ## Format code with ruff
 	@echo "Formatting code with ruff..."
-	$(UV) run ruff format $(SRC_DIR) $(TESTS_DIR) $(EXAMPLES_DIR)
+	$(UV) run ruff format $(SRC_DIR) $(TESTS_DIR) example.py
 
 format-check: ## Check code formatting without making changes
 	@echo "Checking code formatting..."
-	$(UV) run ruff format --check $(SRC_DIR) $(TESTS_DIR) $(EXAMPLES_DIR)
+	$(UV) run ruff format --check $(SRC_DIR) $(TESTS_DIR) example.py
 
 typecheck: ## Run mypy type checker
 	@echo "Running mypy type checker..."
-	$(UV) run mypy $(SRC_DIR)
+	$(UV) run mypy $(SRC_DIR) example.py --explicit-package-bases
 
 check: lint format-check typecheck ## Run all checks (lint, format, typecheck)
 	@echo "All checks passed!"
@@ -188,6 +187,7 @@ benchmark-cython: compile-cython ## Run Cython vs Python comparison benchmark
 	$(VENV_PYTHON) benchmarks/profiling/benchmark_cython_vs_python.py
 
 profile-all: ## Run all profiling scripts
+	@echo ""
 	@echo "Running serialization profiling..."
 	$(VENV_PYTHON) benchmarks/profiling/profile_serialization.py
 	@echo ""

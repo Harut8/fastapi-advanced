@@ -73,6 +73,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["fastapi_advanced*"]
 
+[tool.setuptools.package-data]
+fastapi_advanced = ["py.typed"]
+
 [tool.black]
 line-length = 100
 target-version = ["py310", "py311", "py312"]
@@ -105,9 +108,19 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+# Support for type stubs
+files = ["src/fastapi_advanced/**/*.py", "src/fastapi_advanced/**/*.pyi"]
 
 [[tool.mypy.overrides]]
 module = "msgspec.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fastapi_advanced._speedups"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fastapi_advanced._speedups_fallback"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

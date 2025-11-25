@@ -11,14 +11,13 @@ Performance requirements:
 """
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import msgspec
 import pytest
 
 from fastapi_advanced import _CYTHON_AVAILABLE
 from fastapi_advanced._speedups_fallback import convert_msgspec_type_fast as python_convert
-
 
 # Only import Cython version if available
 if _CYTHON_AVAILABLE:
@@ -44,7 +43,7 @@ class MediumModel(msgspec.Struct):
     age: int
     score: float
     active: bool
-    tags: List[str]
+    tags: list[str]
 
 
 class ComplexModel(msgspec.Struct):
@@ -52,12 +51,14 @@ class ComplexModel(msgspec.Struct):
 
     id: int
     name: str
-    metadata: Dict[str, Any]
-    items: List[MediumModel]
-    optional_field: Optional[str] = None
+    metadata: dict[str, Any]
+    items: list[MediumModel]
+    optional_field: str | None = None
 
 
-def benchmark_type_conversion(convert_func: Any, model_class: type, iterations: int = 10000) -> float:
+def benchmark_type_conversion(
+    convert_func: Any, model_class: type, iterations: int = 10000
+) -> float:
     """
     Benchmark type conversion function.
 
@@ -93,13 +94,13 @@ def test_cython_simple_model_performance():
 
     speedup = python_time / cython_time
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Simple Model Performance (3 fields, {iterations} iterations)")
-    print(f"{'='*60}")
-    print(f"Python time:  {python_time*1000:.2f} ms")
-    print(f"Cython time:  {cython_time*1000:.2f} ms")
+    print(f"{'=' * 60}")
+    print(f"Python time:  {python_time * 1000:.2f} ms")
+    print(f"Cython time:  {cython_time * 1000:.2f} ms")
     print(f"Speedup:      {speedup:.2f}x")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Assert Cython is at least 1.5x faster
     assert speedup >= 1.5, f"Cython speedup ({speedup:.2f}x) is less than required 1.5x"
@@ -116,13 +117,13 @@ def test_cython_medium_model_performance():
 
     speedup = python_time / cython_time
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Medium Model Performance (7 fields, {iterations} iterations)")
-    print(f"{'='*60}")
-    print(f"Python time:  {python_time*1000:.2f} ms")
-    print(f"Cython time:  {cython_time*1000:.2f} ms")
+    print(f"{'=' * 60}")
+    print(f"Python time:  {python_time * 1000:.2f} ms")
+    print(f"Cython time:  {cython_time * 1000:.2f} ms")
     print(f"Speedup:      {speedup:.2f}x")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Assert Cython is at least 2x faster
     assert speedup >= 2.0, f"Cython speedup ({speedup:.2f}x) is less than required 2.0x"
@@ -139,13 +140,13 @@ def test_cython_complex_model_performance():
 
     speedup = python_time / cython_time
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Complex Model Performance (nested, {iterations} iterations)")
-    print(f"{'='*60}")
-    print(f"Python time:  {python_time*1000:.2f} ms")
-    print(f"Cython time:  {cython_time*1000:.2f} ms")
+    print(f"{'=' * 60}")
+    print(f"Python time:  {python_time * 1000:.2f} ms")
+    print(f"Cython time:  {cython_time * 1000:.2f} ms")
     print(f"Speedup:      {speedup:.2f}x")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Assert Cython is at least 2x faster for complex models
     assert speedup >= 2.0, f"Cython speedup ({speedup:.2f}x) is less than required 2.0x"
@@ -156,7 +157,7 @@ def test_python_fallback_available():
     """Test that pure Python fallback is always available."""
     # This should never fail - fallback must always work
     result = python_convert(int)
-    assert result == int
+    assert result is int
 
 
 @pytest.mark.benchmark
@@ -178,19 +179,19 @@ def test_overall_average_speedup():
 
     avg_speedup = sum(speedups) / len(speedups)
 
-    print(f"\n{'='*60}")
-    print(f"Overall Average Performance")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("Overall Average Performance")
+    print(f"{'=' * 60}")
     print(f"Simple model:   {speedups[0]:.2f}x")
     print(f"Medium model:   {speedups[1]:.2f}x")
     print(f"Complex model:  {speedups[2]:.2f}x")
     print(f"Average:        {avg_speedup:.2f}x")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Assert average speedup is at least 2x
-    assert (
-        avg_speedup >= 2.0
-    ), f"Average Cython speedup ({avg_speedup:.2f}x) is less than required 2.0x"
+    assert avg_speedup >= 2.0, (
+        f"Average Cython speedup ({avg_speedup:.2f}x) is less than required 2.0x"
+    )
 
 
 @pytest.mark.benchmark
@@ -209,9 +210,9 @@ def test_cython_correctness():
     for test_type in test_types:
         python_result = python_convert(test_type)
         cython_result = cython_convert(test_type)
-        assert (
-            python_result == cython_result
-        ), f"Cython result differs from Python for type {test_type}"
+        assert python_result == cython_result, (
+            f"Cython result differs from Python for type {test_type}"
+        )
 
 
 if __name__ == "__main__":

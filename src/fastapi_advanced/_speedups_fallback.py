@@ -8,7 +8,7 @@ class TypeConverter:
     """Pure Python type converter (fallback implementation)."""
 
     def __init__(self) -> None:
-        self._type_cache = {}
+        self._type_cache: dict[str, Any] = {}
 
     def convert_type(self, field_type: Any) -> Any:
         """Convert msgspec type to Python type annotation."""
@@ -80,23 +80,23 @@ class TypeConverter:
     def _convert_union_type(self, field_type: Any) -> Any:
         """Convert UnionType."""
         if hasattr(field_type, "types"):
-            from typing import Union
-
             types = [self.convert_type(t) for t in field_type.types]
             # Handle Optional (T | None)
             if len(types) == 2 and type(None) in [type(t) for t in field_type.types]:
                 non_none = [
-                    self.convert_type(t)
-                    for t in field_type.types
-                    if type(t) is not type(None)
+                    self.convert_type(t) for t in field_type.types if type(t) is not type(None)
                 ][0]
                 return non_none | None
-            return Union[tuple(types)]  # type: ignore
+            # Use | syntax for union types
+            result = types[0]
+            for t in types[1:]:
+                result = result | t
+            return result
         return Any
 
     def _convert_struct_type(self, field_type: Any) -> Any:
         """Convert StructType."""
-        from fastapi_advanced.core import msgspec_to_pydantic
+        from .core import msgspec_to_pydantic
 
         return msgspec_to_pydantic(field_type.cls)
 
@@ -132,7 +132,9 @@ def validate_username_length_fast(username: str, min_len: int = 3, max_len: int 
 # ============================================================================
 
 
-def process_struct_fields_fast(struct_cls: Any, type_converter_func: Any) -> dict[str, tuple[Any, Any]]:
+def process_struct_fields_fast(
+    struct_cls: Any, type_converter_func: Any
+) -> dict[str, tuple[Any, Any]]:
     """Process msgspec struct fields and convert to Pydantic field definitions."""
     import msgspec
 
@@ -187,7 +189,9 @@ class PaginationCalculator:
         }
 
 
-def calculate_pagination_fast(total_results: int, page_size: int, current_page: int) -> dict[str, int | bool]:
+def calculate_pagination_fast(
+    total_results: int, page_size: int, current_page: int
+) -> dict[str, int | bool]:
     """Calculate pagination metadata (pure Python fallback)."""
     calc = PaginationCalculator(total_results, page_size, current_page)
     return calc.get_metadata()

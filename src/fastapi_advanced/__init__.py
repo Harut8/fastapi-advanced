@@ -3,13 +3,15 @@
 __version__ = "2.0.0"
 
 from .core import (
+    # Performance Indicators
+    _CYTHON_AVAILABLE,
     # Response Classes
     MsgspecJSONResponse,
     # Response Models (msgspec - runtime)
     PaginatedResponse,
-    ResponseModel,
     # Response Schemas (Pydantic - OpenAPI documentation)
     PaginatedResponseSchema,
+    ResponseModel,
     ResponseModelSchema,
     # Request Body Helper
     as_body,
@@ -17,14 +19,12 @@ from .core import (
     decode_error_handler,
     # Utilities
     msgspec_to_pydantic,
-    # Response Helpers (recommended)
+    # Response Helpers
     paginated_response,
     response,
     # Setup
     setup_msgspec,
     validation_error_handler,
-    # Performance Indicators
-    _CYTHON_AVAILABLE,
 )
 
 __all__ = [
@@ -42,9 +42,9 @@ __all__ = [
     "as_body",
     # Setup (ONE LINE!)
     "setup_msgspec",
-    # Response Helpers (recommended)
-    "response",
-    "paginated_response",
+    # Response Helpers
+    "response",  # Typed response function (generic via stub files)
+    "paginated_response",  # For paginated responses
     # Utilities
     "msgspec_to_pydantic",
     # Error Handlers

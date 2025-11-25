@@ -14,6 +14,8 @@ from pydantic import BaseModel, create_model
 try:
     from fastapi_advanced._speedups import (
         convert_msgspec_type_fast as _convert_type_impl,
+    )
+    from fastapi_advanced._speedups import (
         create_paginated_dict_fast,
         create_response_dict_fast,
         process_struct_fields_fast,
@@ -23,6 +25,8 @@ try:
 except ImportError:
     from fastapi_advanced._speedups_fallback import (
         convert_msgspec_type_fast as _convert_type_impl,
+    )
+    from fastapi_advanced._speedups_fallback import (
         create_paginated_dict_fast,
         create_response_dict_fast,
         process_struct_fields_fast,
@@ -119,7 +123,24 @@ def _msgspec_type_to_python_type(field_type: Any) -> Any:
 
 
 def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
-    """Convert msgspec.Struct to Pydantic BaseModel for OpenAPI generation. Thread-safe with caching."""
+    """
+    Convert msgspec.Struct to Pydantic BaseModel for OpenAPI generation.
+
+    Thread-safe with caching for performance.
+
+    Args:
+        struct_cls: msgspec.Struct class to convert
+
+    Returns:
+        Pydantic BaseModel class with same fields
+
+    Example:
+        >>> class User(msgspec.Struct):
+        ...     name: str
+        ...     email: str
+        >>> UserSchema = msgspec_to_pydantic(User)
+        >>> # Use in FastAPI: response_model=UserSchema
+    """
     if struct_cls in _SCHEMA_REGISTRY:
         return _SCHEMA_REGISTRY[struct_cls]
 
@@ -140,7 +161,25 @@ def msgspec_to_pydantic(struct_cls: type[msgspec.Struct]) -> type[BaseModel]:
 
 
 def as_body(struct_cls: type[T]) -> Any:
-    """Get Pydantic model for request body validation and OpenAPI docs."""
+    """
+    Get Pydantic model for request body validation and OpenAPI docs.
+
+    Use as FastAPI dependency annotation for request bodies.
+
+    Args:
+        struct_cls: msgspec.Struct class to use for validation
+
+    Returns:
+        Pydantic model class for FastAPI Body parameter
+
+    Example:
+        >>> class CreateUser(msgspec.Struct):
+        ...     name: str
+        ...     email: str
+        >>> @app.post("/users")
+        ... async def create_user(data: CreateUserSchema = as_body(CreateUser)):
+        ...     return response(data)
+    """
     return msgspec_to_pydantic(struct_cls)
 
 
@@ -155,7 +194,27 @@ def response(
     status: str = "ok",
     status_code: int = 200,
 ) -> MsgspecJSONResponse:
-    """Create a standardized API response with msgspec serialization."""
+    """
+    Create a standardized API response with msgspec serialization.
+
+    For type-safe usage, this function returns ResponseModelSchema[T]
+    at type-check time via the .pyi stub files.
+
+    Args:
+        data: The response data (any JSON-serializable object)
+        message: Optional message string
+        status: Response status (default: "ok")
+        status_code: HTTP status code (default: 200)
+
+    Returns:
+        MsgspecJSONResponse at runtime, ResponseModelSchema[T] for type checking
+
+    Example:
+        >>> @app.get("/users/{id}")
+        >>> async def get_user(id: int) -> ResponseModelSchema[User]:
+        >>>     user = get_user_from_db(id)
+        >>>     return response(data=user)
+    """
     response_dict = create_response_dict_fast(
         data=data,
         message=message or "",
