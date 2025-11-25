@@ -61,10 +61,9 @@ examples = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/fastapi-advanced"
-Documentation = "https://github.com/your-org/fastapi-advanced"
-Repository = "https://github.com/your-org/fastapi-advanced"
-Issues = "https://github.com/your-org/fastapi-advanced/issues"
+Homepage = "https://github.com/Harut8/fastapi-advanced"
+Documentation = "https://github.com/Harut8/fastapi-advanced/README.MD"
+Repository = "https://github.com/Harut8/fastapi-advanced"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

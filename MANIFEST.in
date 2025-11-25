@@ -1,0 +1,23 @@
+# Include all essential files for source distribution
+include README.md
+include LICENSE
+include pyproject.toml
+include setup.py
+
+# Include Cython source files (REQUIRED for building from sdist)
+recursive-include src/fastapi_advanced *.pyx
+recursive-include src/fastapi_advanced *.c
+
+# Include type stubs for static type checking
+recursive-include src/fastapi_advanced *.pyi
+include src/fastapi_advanced/py.typed
+
+# Include fallback pure Python implementations
+recursive-include src/fastapi_advanced *_fallback.py
+
+# Exclude build artifacts and cache
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude *.so
+global-exclude .DS_Store
