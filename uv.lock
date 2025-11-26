@@ -553,7 +553,7 @@ wheels = [
 
 [[package]]
 name = "fastapi-advanced"
-version = "0.1.0"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -588,6 +588,7 @@ examples = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "bump2version" },
     { name = "setuptools" },
     { name = "uvicorn" },
 ]
@@ -618,6 +619,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "bump2version", specifier = ">=1.0.1" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]
