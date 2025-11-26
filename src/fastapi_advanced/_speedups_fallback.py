@@ -1,7 +1,9 @@
 """Pure Python fallback for _speedups module (used when Cython not available)."""
 
 import re
+from datetime import date, datetime
 from typing import Any
+from uuid import UUID
 
 
 class TypeConverter:
@@ -41,11 +43,53 @@ class TypeConverter:
             result = self._convert_union_type(field_type)
         elif type_name == "StructType":
             result = self._convert_struct_type(field_type)
+        elif type_name == "EnumType":
+            result = self._convert_enum_type(field_type)
+        elif type_name == "NoneType":
+            result = type(None)
+        elif type_name == "Metadata":
+            result = self._convert_metadata_type(field_type)
+        elif type_name == "DateTimeType":
+            result = datetime
+        elif type_name == "DateType":
+            result = date
+        elif type_name == "UUIDType":
+            result = UUID
+        elif type_name == "TimeType":
+            from datetime import time
+
+            result = time
+        elif type_name == "TimeDeltaType":
+            from datetime import timedelta
+
+            result = timedelta
+        elif type_name == "BytesType":
+            result = bytes
+        elif type_name == "ByteArrayType":
+            result = bytearray
+        elif type_name == "DecimalType":
+            from decimal import Decimal
+
+            result = Decimal
         else:
             result = Any
 
-        # Cache result
-        self._type_cache[type_name] = result
+        # Cache simple types (not composite types like Union, List, Enum, Struct)
+        if type_name in (
+            "IntType",
+            "StrType",
+            "FloatType",
+            "BoolType",
+            "DateTimeType",
+            "DateType",
+            "UUIDType",
+            "TimeType",
+            "TimeDeltaType",
+            "BytesType",
+            "ByteArrayType",
+            "DecimalType",
+        ):
+            self._type_cache[type_name] = result
         return result
 
     def _convert_list_type(self, field_type: Any) -> Any:
@@ -81,11 +125,9 @@ class TypeConverter:
         """Convert UnionType."""
         if hasattr(field_type, "types"):
             types = [self.convert_type(t) for t in field_type.types]
-            # Handle Optional (T | None)
-            if len(types) == 2 and type(None) in [type(t) for t in field_type.types]:
-                non_none = [
-                    self.convert_type(t) for t in field_type.types if type(t) is not type(None)
-                ][0]
+            # Handle Optional (T | None) - check if any converted type is NoneType
+            if len(types) == 2 and type(None) in types:
+                non_none = [t for t in types if t is not type(None)][0]
                 return non_none | None
             # Use | syntax for union types
             result = types[0]
@@ -95,10 +137,24 @@ class TypeConverter:
         return Any
 
     def _convert_struct_type(self, field_type: Any) -> Any:
-        """Convert StructType."""
+        """Convert StructType - return the Pydantic schema for nested structs."""
         from .core import msgspec_to_pydantic
 
+        # Use forward reference string to avoid infinite recursion
+        # The actual schema will be resolved by Pydantic at model creation time
         return msgspec_to_pydantic(field_type.cls)
+
+    def _convert_enum_type(self, field_type: Any) -> Any:
+        """Convert EnumType to the actual Python Enum class."""
+        if hasattr(field_type, "cls"):
+            return field_type.cls
+        return Any
+
+    def _convert_metadata_type(self, field_type: Any) -> Any:
+        """Convert Metadata type by unwrapping the inner type."""
+        if hasattr(field_type, "type"):
+            return self.convert_type(field_type.type)
+        return Any
 
 
 # Global singleton
@@ -134,14 +190,19 @@ def validate_username_length_fast(username: str, min_len: int = 3, max_len: int 
 
 def process_struct_fields_fast(
     struct_cls: Any, type_converter_func: Any
-) -> dict[str, tuple[Any, Any]]:
-    """Process msgspec struct fields and convert to Pydantic field definitions."""
+) -> dict[str, tuple[Any, Any, dict[str, Any] | None]]:
+    """Process msgspec struct fields and convert to Pydantic field definitions.
+
+    Returns:
+        Dictionary mapping field names to (python_type, default_value, metadata).
+        metadata contains 'description' and 'examples' from msgspec.Meta if present.
+    """
     import msgspec
 
     type_info = msgspec.inspect.type_info(struct_cls)
-    field_definitions: dict[str, tuple[Any, Any]] = {}
+    field_definitions: dict[str, tuple[Any, Any, dict[str, Any] | None]] = {}
 
-    for field in type_info.fields:
+    for field in type_info.fields:  # type: ignore[attr-defined]
         python_type = type_converter_func(field.type)
 
         if field.default is not msgspec.NODEFAULT:
@@ -151,7 +212,18 @@ def process_struct_fields_fast(
         else:
             default_value = ...
 
-        field_definitions[field.name] = (python_type, default_value)
+        # Extract metadata from Metadata type (Annotated[T, msgspec.Meta(...)])
+        metadata: dict[str, Any] | None = None
+        if type(field.type).__name__ == "Metadata":
+            extra = getattr(field.type, "extra_json_schema", None)
+            if extra:
+                metadata = {}
+                if "description" in extra:
+                    metadata["description"] = extra["description"]
+                if "examples" in extra:
+                    metadata["examples"] = extra["examples"]
+
+        field_definitions[field.name] = (python_type, default_value, metadata)
 
     return field_definitions
 

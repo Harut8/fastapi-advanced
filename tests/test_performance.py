@@ -156,7 +156,11 @@ def test_cython_complex_model_performance():
 def test_python_fallback_available():
     """Test that pure Python fallback is always available."""
     # This should never fail - fallback must always work
-    result = python_convert(int)
+    # Use msgspec.inspect to get proper type objects (not raw Python types)
+    type_info = msgspec.inspect.type_info(SimpleModel)
+    # First field is 'id: int' - its type should be IntType
+    int_field_type = type_info.fields[0].type
+    result = python_convert(int_field_type)
     assert result is int
 
 

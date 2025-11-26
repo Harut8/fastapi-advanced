@@ -37,6 +37,17 @@ cdef enum TypeId:
     TYPE_UNION = 8
     TYPE_STRUCT = 9
     TYPE_UNKNOWN = 10
+    TYPE_ENUM = 11
+    TYPE_NONE = 12
+    TYPE_METADATA = 13
+    TYPE_DATETIME = 14
+    TYPE_DATE = 15
+    TYPE_UUID = 16
+    TYPE_TIME = 17
+    TYPE_TIMEDELTA = 18
+    TYPE_BYTES = 19
+    TYPE_BYTEARRAY = 20
+    TYPE_DECIMAL = 21
 
 # Pre-computed character constants for email validation (avoid ord() calls)
 cdef:
@@ -81,21 +92,46 @@ cdef inline TypeId _get_type_id_with_gil(str type_name):
     elif first_char == 76:  # 'L' - ListType
         if type_name == "ListType":
             return TYPE_LIST
-    elif first_char == 68:  # 'D' - DictType
+    elif first_char == 68:  # 'D' - DictType, DateTimeType, DateType, DecimalType
         if type_name == "DictType":
             return TYPE_DICT
+        elif type_name == "DateTimeType":
+            return TYPE_DATETIME
+        elif type_name == "DateType":
+            return TYPE_DATE
+        elif type_name == "DecimalType":
+            return TYPE_DECIMAL
     elif first_char == 70:  # 'F' - FloatType
         if type_name == "FloatType":
             return TYPE_FLOAT
-    elif first_char == 66:  # 'B' - BoolType
+    elif first_char == 66:  # 'B' - BoolType, BytesType, ByteArrayType
         if type_name == "BoolType":
             return TYPE_BOOL
-    elif first_char == 84:  # 'T' - TupleType
+        elif type_name == "BytesType":
+            return TYPE_BYTES
+        elif type_name == "ByteArrayType":
+            return TYPE_BYTEARRAY
+    elif first_char == 84:  # 'T' - TupleType, TimeType, TimeDeltaType
         if type_name == "TupleType":
             return TYPE_TUPLE
-    elif first_char == 85:  # 'U' - UnionType
+        elif type_name == "TimeType":
+            return TYPE_TIME
+        elif type_name == "TimeDeltaType":
+            return TYPE_TIMEDELTA
+    elif first_char == 85:  # 'U' - UnionType, UUIDType
         if type_name == "UnionType":
             return TYPE_UNION
+        elif type_name == "UUIDType":
+            return TYPE_UUID
+    elif first_char == 69:  # 'E' - EnumType
+        if type_name == "EnumType":
+            return TYPE_ENUM
+    elif first_char == 78:  # 'N' - NoneType
+        if type_name == "NoneType":
+            return TYPE_NONE
+    elif first_char == 77:  # 'M' - Metadata
+        if type_name == "Metadata":
+            return TYPE_METADATA
 
     return TYPE_UNKNOWN
 
@@ -151,11 +187,39 @@ cdef class TypeConverter:
             result = self._convert_union_type(field_type)
         elif type_id == TYPE_STRUCT:
             result = self._convert_struct_type(field_type)
+        elif type_id == TYPE_ENUM:
+            result = self._convert_enum_type(field_type)
+        elif type_id == TYPE_NONE:
+            result = type(None)
+        elif type_id == TYPE_METADATA:
+            result = self._convert_metadata_type(field_type)
+        elif type_id == TYPE_DATETIME:
+            from datetime import datetime
+            result = datetime
+        elif type_id == TYPE_DATE:
+            from datetime import date
+            result = date
+        elif type_id == TYPE_UUID:
+            from uuid import UUID
+            result = UUID
+        elif type_id == TYPE_TIME:
+            from datetime import time
+            result = time
+        elif type_id == TYPE_TIMEDELTA:
+            from datetime import timedelta
+            result = timedelta
+        elif type_id == TYPE_BYTES:
+            result = bytes
+        elif type_id == TYPE_BYTEARRAY:
+            result = bytearray
+        elif type_id == TYPE_DECIMAL:
+            from decimal import Decimal
+            result = Decimal
         else:
             result = Any
 
-        # Cache result (only cache simple types, not composite)
-        if type_id <= TYPE_BOOL:  # Simple types only
+        # Cache result (cache simple scalar types for performance)
+        if type_id <= TYPE_BOOL or (type_id >= TYPE_DATETIME and type_id <= TYPE_DECIMAL):
             self._type_cache[type_name] = result
 
         return result
@@ -206,8 +270,7 @@ cdef class TypeConverter:
         cdef object types_attr = "types"
         cdef list types
         cdef object t
-        cdef Py_ssize_t i, n
-        cdef object t1, t2
+        cdef Py_ssize_t n
         cdef type none_type
 
         if PyObject_HasAttr(field_type, types_attr):
@@ -216,18 +279,14 @@ cdef class TypeConverter:
             for t in field_type.types:
                 types.append(self.convert_type(t))
 
-            # Handle Optional (T | None) - optimized check
+            # Handle Optional (T | None) - check if any converted type is NoneType
             n = len(types)
-            if n == 2:
-                # Check if one of the types is None
-                t1 = field_type.types[0]
-                t2 = field_type.types[1]
-                none_type = type(None)
-
-                if type(t1) is none_type:
-                    return Union[self.convert_type(t2), None]
-                elif type(t2) is none_type:
-                    return Union[self.convert_type(t1), None]
+            none_type = type(None)
+            if n == 2 and none_type in types:
+                # Get the non-None type from already converted types
+                for t in types:
+                    if t is not none_type:
+                        return Union[t, None]
 
             return Union[tuple(types)]
         return Any
@@ -235,6 +294,20 @@ cdef class TypeConverter:
     cdef inline object _convert_struct_type(self, object field_type):
         """Convert StructType."""
         return _get_msgspec_converter()(field_type.cls)
+
+    cdef inline object _convert_enum_type(self, object field_type):
+        """Convert EnumType to the actual Python Enum class."""
+        cdef object cls_attr = "cls"
+        if PyObject_HasAttr(field_type, cls_attr):
+            return field_type.cls
+        return Any
+
+    cdef inline object _convert_metadata_type(self, object field_type):
+        """Convert Metadata type by unwrapping the inner type."""
+        cdef object type_attr = "type"
+        if PyObject_HasAttr(field_type, type_attr):
+            return self.convert_type(field_type.type)
+        return Any
 
 
 # Global singleton instance
@@ -316,6 +389,10 @@ def process_struct_fields_fast(object struct_cls, object type_converter_func) ->
     Fast field processing for msgspec structs with zero-copy optimization (C-level).
 
     Uses pre-allocated dictionary and C-level indexing for maximum performance.
+
+    Returns:
+        Dictionary mapping field names to (python_type, default_value, metadata).
+        metadata contains 'description' and 'examples' from msgspec.Meta if present.
     """
     import msgspec
 
@@ -333,6 +410,9 @@ def process_struct_fields_fast(object struct_cls, object type_converter_func) ->
         object field_default_factory
         Py_ssize_t i, n_fields
         object ellipsis = ...
+        str field_type_name
+        object extra
+        dict metadata
 
     # Get fields list
     cdef object fields = type_info.fields
@@ -362,8 +442,20 @@ def process_struct_fields_fast(object struct_cls, object type_converter_func) ->
             # Use cached ellipsis for required fields
             default_value = ellipsis
 
+        # Extract metadata from Metadata type (Annotated[T, msgspec.Meta(...)])
+        metadata = None
+        field_type_name = type(field.type).__name__
+        if field_type_name == "Metadata":
+            extra = getattr(field.type, "extra_json_schema", None)
+            if extra is not None:
+                metadata = {}
+                if "description" in extra:
+                    metadata["description"] = extra["description"]
+                if "examples" in extra:
+                    metadata["examples"] = extra["examples"]
+
         # Direct C-level dictionary insertion (zero-copy)
-        PyDict_SetItem(field_definitions, field_name, (python_type, default_value))
+        PyDict_SetItem(field_definitions, field_name, (python_type, default_value, metadata))
 
     return field_definitions
 

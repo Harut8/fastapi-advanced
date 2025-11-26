@@ -259,6 +259,114 @@ class User(msgspec.Struct, rename="camel"):
 
 ## Advanced Features
 
+### Enum Support
+
+Enums are fully supported in OpenAPI documentation. When you use Python enums in your msgspec structs, the generated OpenAPI schema will show all valid enum values and validate input accordingly.
+
+```python
+from enum import Enum
+
+class UserRole(Enum):
+    ADMIN = "admin"
+    MODERATOR = "moderator"
+    USER = "user"
+
+class User(msgspec.Struct, rename="camel"):
+    id: int
+    username: str
+    role: UserRole
+
+# OpenAPI will show:
+# {
+#   "role": {
+#     "type": "string",
+#     "enum": ["admin", "moderator", "user"]
+#   }
+# }
+```
+
+Invalid enum values in requests will return a 422 validation error.
+
+### Field Metadata (Description and Examples)
+
+You can add descriptions and examples to your fields using `msgspec.Meta`. These will appear in the OpenAPI documentation.
+
+```python
+from typing import Annotated
+
+class Address(msgspec.Struct, rename="camel", kw_only=True):
+    street: Annotated[
+        str,
+        msgspec.Meta(
+            description="Street address including number",
+            examples=["123 Main St", "456 Oak Avenue"],
+        ),
+    ]
+    city: Annotated[
+        str,
+        msgspec.Meta(
+            description="City name",
+            examples=["New York", "Los Angeles"],
+        ),
+    ]
+    postal_code: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Postal or ZIP code",
+            examples=["10001", "90210"],
+        ),
+    ] = None
+```
+
+The OpenAPI schema will include:
+
+```json
+{
+  "street": {
+    "type": "string",
+    "description": "Street address including number",
+    "examples": ["123 Main St", "456 Oak Avenue"]
+  }
+}
+```
+
+### DateTime, Date, and UUID Types
+
+The library automatically generates proper OpenAPI format annotations for common Python types. This means your API documentation will show the correct data format expectations.
+
+```python
+from datetime import date, datetime
+from uuid import UUID
+
+class Event(msgspec.Struct, rename="camel"):
+    id: UUID
+    name: str
+    start_time: datetime
+    end_date: date | None = None
+```
+
+OpenAPI will show proper format annotations:
+
+```json
+{
+  "id": {"type": "string", "format": "uuid"},
+  "startTime": {"type": "string", "format": "date-time"},
+  "endDate": {"type": "string", "format": "date"}
+}
+```
+
+Supported types and their OpenAPI formats:
+
+| Python Type | OpenAPI Format |
+|-------------|----------------|
+| `datetime` | `date-time` |
+| `date` | `date` |
+| `time` | `time` |
+| `timedelta` | `duration` |
+| `UUID` | `uuid` |
+| `bytes` | `binary` |
+| `Decimal` | `decimal` |
+
 ### Tagged Unions
 
 Support for discriminated unions:
@@ -282,6 +390,39 @@ class Drawing(msgspec.Struct):
 
 # Automatic discrimination based on "type" field
 ```
+
+### Nested Structs
+
+You can nest msgspec structs within each other. The library handles nested schema generation automatically.
+
+```python
+class Address(msgspec.Struct, rename="camel"):
+    street: str
+    city: str
+    country: str
+
+class SocialLinks(msgspec.Struct, rename="camel"):
+    twitter: str | None = None
+    linkedin: str | None = None
+
+class UserProfile(msgspec.Struct, rename="camel"):
+    id: int
+    username: str
+    address: Address | None = None
+    social_links: SocialLinks | None = None
+```
+
+All nested structs are converted to their corresponding Pydantic schemas for OpenAPI documentation.
+
+### Thread Safety
+
+The schema conversion is thread-safe. The library uses a reentrant lock to handle concurrent schema generation in multi-threaded environments like production ASGI servers. This means:
+
+- Multiple requests can safely trigger schema conversion simultaneously
+- Nested structs are handled correctly without deadlocks
+- Circular references between structs are detected and handled with forward references
+
+The schema registry caches converted schemas, so each struct is only converted once regardless of how many threads access it.
 
 ### Optional Cython Optimizations
 

@@ -37,7 +37,7 @@ from src.fastapi_advanced import (
 # ============================================================================
 
 
-class CreateUserRequest(msgspec.Struct, rename="camel"):  # type: ignore[call-arg, misc]
+class CreateUserRequest(msgspec.Struct, rename="camel"):
     """User creation request with automatic camelCase conversion."""
 
     username: str
@@ -45,7 +45,7 @@ class CreateUserRequest(msgspec.Struct, rename="camel"):  # type: ignore[call-ar
     full_name: str | None = None
 
 
-class User(msgspec.Struct, rename="camel"):  # type: ignore[call-arg, misc]
+class User(msgspec.Struct, rename="camel"):
     """User model with automatic camelCase conversion."""
 
     id: int
