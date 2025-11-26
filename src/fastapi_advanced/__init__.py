@@ -1,6 +1,6 @@
 """FastAPI-Advanced: Fast msgspec integration with OpenAPI support."""
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 from .core import (
     # Performance Indicators
