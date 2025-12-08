@@ -4,6 +4,7 @@ High-performance FastAPI integration with msgspec for fast serialization and aut
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![blazingly fast](https://blazingly.fast/api/badge.svg?repo=Harut8%2Ffastapi-advanced)](https://blazingly.fast)
 
 ## Overview
 
